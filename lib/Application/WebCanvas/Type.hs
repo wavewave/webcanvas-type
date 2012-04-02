@@ -16,69 +16,54 @@ import qualified Data.Map as M
 
 import Data.Acid 
 import Data.UUID
+import Data.UUID.Instances
 import Data.Aeson
 import Data.Text.Encoding as E
 import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString as B
+import Data.Time.Clock
 
-data WebcanvasInfo = WebcanvasInfo { 
+data WebCanvasItem = WebCanvasItem { 
   webcanvas_uuid :: UUID, 
-  webcanvas_name :: String
+  webcanvas_creationtime :: UTCTime 
 } deriving (Show,Typeable,Data)
 
+instance FromJSON WebCanvasItem where
+  parseJSON (Object v) = WebCanvasItem <$>  v .: "uuid" <*> v .: "creationtime"
 
-instance FromJSON UUID where
-  parseJSON x = do r <- return . fromString . C.unpack . E.encodeUtf8 =<< parseJSON x
-                   case r of 
-                     Nothing -> fail ("UUID parsing failed " ++ show x )
-                     Just uuid -> return uuid 
+instance ToJSON WebCanvasItem where
+  toJSON (WebCanvasItem uuid ctime) = object [ "uuid" .= uuid , "creationname" .= ctime ] 
 
-instance ToJSON UUID where
-  toJSON = toJSON . E.decodeUtf8 . C.pack . toString 
+$(deriveSafeCopy 0 'base ''WebCanvasItem)
 
-instance FromJSON WebcanvasInfo where
-  parseJSON (Object v) = WebcanvasInfo <$>  v .: "uuid" <*> v .: "name"
+type WebCanvasItemRepository = M.Map UUID WebCanvasItem 
 
-instance ToJSON WebcanvasInfo where
-  toJSON (WebcanvasInfo uuid name) = object [ "uuid" .= uuid , "name" .= name ] 
-
-
-instance SafeCopy UUID where 
-  putCopy uuid = contain $ safePut (toByteString uuid) 
-  getCopy = contain 
-            $ maybe (fail "cannot parse UUID") return . fromByteString 
-              =<< safeGet
-
-$(deriveSafeCopy 0 'base ''WebcanvasInfo)
-
-type WebcanvasInfoRepository = M.Map UUID WebcanvasInfo 
-
-addWebcanvas :: WebcanvasInfo -> Update WebcanvasInfoRepository WebcanvasInfo 
-addWebcanvas minfo = do 
+addWebCanvasItem :: WebCanvasItem -> Update WebCanvasItemRepository WebCanvasItem 
+addWebCanvasItem minfo = do 
   m <- get 
   let (r,m') = M.insertLookupWithKey (\_k _o n -> n) (webcanvas_uuid minfo) minfo m
   put m'
   return minfo
  
-queryWebcanvas :: UUID -> Query WebcanvasInfoRepository (Maybe WebcanvasInfo) 
-queryWebcanvas uuid = do 
+queryWebCanvasItem :: UUID -> Query WebCanvasItemRepository (Maybe WebCanvasItem) 
+queryWebCanvasItem uuid = do 
   m <- ask 
   return (M.lookup uuid m)
 
-queryAll :: Query WebcanvasInfoRepository [WebcanvasInfo]
+queryAll :: Query WebCanvasItemRepository [WebCanvasItem]
 queryAll = do m <- ask   
               return (M.elems m)
 
 
-updateWebcanvas :: WebcanvasInfo -> Update WebcanvasInfoRepository (Maybe WebcanvasInfo)
-updateWebcanvas minfo = do 
+updateWebCanvasItem :: WebCanvasItem -> Update WebCanvasItemRepository (Maybe WebCanvasItem)
+updateWebCanvasItem minfo = do 
   m <- get 
   let (r,m') = M.updateLookupWithKey (\_ _ -> Just minfo) (webcanvas_uuid minfo) m
   put m'
   maybe (return Nothing) (const (return (Just minfo))) r 
 
-deleteWebcanvas :: UUID -> Update WebcanvasInfoRepository (Maybe WebcanvasInfo)
-deleteWebcanvas uuid = do 
+deleteWebCanvasItem :: UUID -> Update WebCanvasItemRepository (Maybe WebCanvasItem)
+deleteWebCanvasItem uuid = do 
   m <- get
   let r = M.lookup uuid m  
   case r of 
@@ -89,4 +74,4 @@ deleteWebcanvas uuid = do
     Nothing -> return Nothing
 
 
-$(makeAcidic ''WebcanvasInfoRepository [ 'addWebcanvas, 'queryWebcanvas, 'queryAll, 'updateWebcanvas, 'deleteWebcanvas] )
+$(makeAcidic ''WebCanvasItemRepository [ 'addWebCanvasItem, 'queryWebCanvasItem, 'queryAll, 'updateWebCanvasItem, 'deleteWebCanvasItem] )
