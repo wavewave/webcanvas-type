@@ -32,7 +32,7 @@ instance FromJSON WebCanvasItem where
   parseJSON (Object v) = WebCanvasItem <$>  v .: "uuid" <*> v .: "creationtime"
 
 instance ToJSON WebCanvasItem where
-  toJSON (WebCanvasItem uuid ctime) = object [ "uuid" .= uuid , "creationname" .= ctime ] 
+  toJSON (WebCanvasItem uuid ctime) = object [ "uuid" .= uuid , "creationtime" .= ctime ] 
 
 $(deriveSafeCopy 0 'base ''WebCanvasItem)
 
